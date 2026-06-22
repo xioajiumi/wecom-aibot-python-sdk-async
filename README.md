@@ -1,8 +1,10 @@
-# wecom-aibot-python-sdk (Python)
+# wecom-aibot-python-sdk-async (Python)
 
 企业微信智能机器人 Python SDK —— 基于 WebSocket 长连接通道，提供消息收发、流式回复、模板卡片、事件回调、文件下载解密等核心能力。
 
 > 本项目是 [@wecom/aibot-node-sdk](https://www.npmjs.com/package/@wecom/aibot-node-sdk)（Node.js 版）的 Python 等价实现。
+
+> 本项目是 [@WecomTeam/wecom-aibot-python-sdk](https://github.com/WecomTeam/wecom-aibot-python-sdk) 的异步适配优化社群版，非官方维护。
 
 ## ✨ 特性
 
@@ -23,10 +25,11 @@
 ## 📦 安装
 
 ```bash
-pip install wecom-aibot-python-sdk
+pip install wecom-aibot-python-sdk-async
 ```
 
 **依赖：**
+
 - Python >= 3.8
 - websockets >= 12.0
 - aiohttp >= 3.9
@@ -46,7 +49,6 @@ cp .env.example .env
 # WECHAT_BOT_SECRET=your-bot-secret
 ```
 
-
 ## 🚀 快速开始
 
 ```python
@@ -61,15 +63,17 @@ load_dotenv()
 # 1. 创建客户端实例
 ws_client = WSClient(
     WSClientOptions(
-        bot_id=os.getenv('WECHAT_BOT_ID'),       # 企业微信后台获取的机器人 ID
-        secret=os.getenv('WECHAT_BOT_SECRET'),   # 企业微信后台获取的机器人 Secret
+        bot_id=os.getenv('WECHAT_BOT_ID'),  # 企业微信后台获取的机器人 ID
+        secret=os.getenv('WECHAT_BOT_SECRET'),  # 企业微信后台获取的机器人 Secret
     )
 )
+
 
 # 2. 监听认证成功
 @ws_client.on('authenticated')
 def on_authenticated():
     print('🔐 认证成功')
+
 
 # 3. 监听文本消息并进行流式回复
 @ws_client.on('message.text')
@@ -86,6 +90,7 @@ async def on_text(frame):
     await asyncio.sleep(1)
     await ws_client.reply_stream(frame, stream_id, f'你好！你说的是: "{content}"', True)
 
+
 # 4. 监听进入会话事件（发送欢迎语）
 @ws_client.on('event.enter_chat')
 async def on_enter_chat(frame):
@@ -93,6 +98,7 @@ async def on_enter_chat(frame):
         'msgtype': 'text',
         'text': {'content': '您好！我是智能助手，有什么可以帮您的吗？'},
     })
+
 
 # 5. 启动（便捷方法，内部管理事件循环）
 ws_client.run()
@@ -105,6 +111,7 @@ async def main():
     await ws_client.connect()
     # 保持运行
     await asyncio.Event().wait()
+
 
 asyncio.run(main())
 ```
@@ -123,37 +130,37 @@ ws_client = WSClient(options: WSClientOptions)
 
 #### 方法
 
-| 方法 | 说明 | 返回值 |
-| --- | --- | --- |
-| `await connect()` | 建立 WebSocket 连接，连接后自动认证 | `WSClient`（支持链式调用） |
-| `disconnect()` | 主动断开连接 | `None` |
-| `await reply(frame, body, cmd?)` | 通过 WebSocket 通道发送回复消息（通用方法） | `WsFrame` |
-| `await reply_stream(frame, stream_id, content, finish?, msg_item?, feedback?)` | 发送流式文本回复（便捷方法，支持 Markdown） | `WsFrame` |
-| `await reply_welcome(frame, body)` | 发送欢迎语回复（支持文本或模板卡片），需在收到事件 5s 内调用 | `WsFrame` |
-| `await reply_template_card(frame, template_card, feedback?)` | 回复模板卡片消息 | `WsFrame` |
-| `await reply_stream_with_card(frame, stream_id, content, finish?, ...)` | 发送流式消息 + 模板卡片组合回复 | `WsFrame` |
-| `await update_template_card(frame, template_card, userids?)` | 更新模板卡片，需在收到事件 5s 内调用 | `WsFrame` |
-| `await send_message(chatid, body)` | 主动发送消息（支持 Markdown 或模板卡片），无需依赖回调帧 | `WsFrame` |
-| `await download_file(url, aes_key?)` | 下载文件并使用 AES 密钥解密 | `tuple[bytes, str \| None]` |
-| `run()` | 便捷启动方法（创建事件循环并连接） | `None` |
+| 方法                                                                             | 说明                                | 返回值                         |
+|--------------------------------------------------------------------------------|-----------------------------------|-----------------------------|
+| `await connect()`                                                              | 建立 WebSocket 连接，连接后自动认证           | `WSClient`（支持链式调用）          |
+| `disconnect()`                                                                 | 主动断开连接                            | `None`                      |
+| `await reply(frame, body, cmd?)`                                               | 通过 WebSocket 通道发送回复消息（通用方法）       | `WsFrame`                   |
+| `await reply_stream(frame, stream_id, content, finish?, msg_item?, feedback?)` | 发送流式文本回复（便捷方法，支持 Markdown）        | `WsFrame`                   |
+| `await reply_welcome(frame, body)`                                             | 发送欢迎语回复（支持文本或模板卡片），需在收到事件 5s 内调用  | `WsFrame`                   |
+| `await reply_template_card(frame, template_card, feedback?)`                   | 回复模板卡片消息                          | `WsFrame`                   |
+| `await reply_stream_with_card(frame, stream_id, content, finish?, ...)`        | 发送流式消息 + 模板卡片组合回复                 | `WsFrame`                   |
+| `await update_template_card(frame, template_card, userids?)`                   | 更新模板卡片，需在收到事件 5s 内调用              | `WsFrame`                   |
+| `await send_message(chatid, body)`                                             | 主动发送消息（支持 Markdown 或模板卡片），无需依赖回调帧 | `WsFrame`                   |
+| `await download_file(url, aes_key?)`                                           | 下载文件并使用 AES 密钥解密                  | `tuple[bytes, str \| None]` |
+| `run()`                                                                        | 便捷启动方法（创建事件循环并连接）                 | `None`                      |
 
 #### 属性
 
-| 属性 | 说明 | 类型 |
-| --- | --- | --- |
-| `is_connected` | 当前 WebSocket 连接状态 | `bool` |
-| `api` | 内部 API 客户端实例（高级用途） | `WeComApiClient` |
+| 属性             | 说明                 | 类型               |
+|----------------|--------------------|------------------|
+| `is_connected` | 当前 WebSocket 连接状态  | `bool`           |
+| `api`          | 内部 API 客户端实例（高级用途） | `WeComApiClient` |
 
 ### `reply_stream` 详细说明
 
 ```python
 await ws_client.reply_stream(
-    frame,              # 收到的原始 WebSocket 帧（透传 req_id）
-    stream_id: str,     # 流式消息 ID（使用 generate_req_id('stream') 生成）
-    content: str,       # 回复内容（支持 Markdown）
-    finish: bool = False,  # 是否结束流式消息
-    msg_item: list = None, # 图文混排项（仅 finish=True 时有效）
-    feedback: dict = None, # 反馈信息（仅首次回复时设置）
+    frame,  # 收到的原始 WebSocket 帧（透传 req_id）
+    stream_id: str,  # 流式消息 ID（使用 generate_req_id('stream') 生成）
+content: str,  # 回复内容（支持 Markdown）
+finish: bool = False,  # 是否结束流式消息
+msg_item: list = None,  # 图文混排项（仅 finish=True 时有效）
+feedback: dict = None,  # 反馈信息（仅首次回复时设置）
 )
 ```
 
@@ -179,14 +186,14 @@ await ws_client.reply_welcome(frame, {
 
 ```python
 await ws_client.reply_stream_with_card(
-    frame,                          # 收到的原始 WebSocket 帧
-    stream_id: str,                 # 流式消息 ID
-    content: str,                   # 回复内容（支持 Markdown）
-    finish: bool = False,           # 是否结束流式消息
-    msg_item: list = None,          # 图文混排项（仅 finish=True 时有效）
-    stream_feedback: dict = None,   # 流式消息反馈信息（首次回复时设置）
-    template_card: dict = None,     # 模板卡片内容（同一消息只能回复一次）
-    card_feedback: dict = None,     # 模板卡片反馈信息
+    frame,  # 收到的原始 WebSocket 帧
+    stream_id: str,  # 流式消息 ID
+content: str,  # 回复内容（支持 Markdown）
+finish: bool = False,  # 是否结束流式消息
+msg_item: list = None,  # 图文混排项（仅 finish=True 时有效）
+stream_feedback: dict = None,  # 流式消息反馈信息（首次回复时设置）
+template_card: dict = None,  # 模板卡片内容（同一消息只能回复一次）
+card_feedback: dict = None,  # 模板卡片反馈信息
 )
 ```
 
@@ -224,58 +231,58 @@ async def on_image(frame):
 
 `WSClientOptions` 完整配置：
 
-| 参数 | 类型 | 必填 | 默认值 | 说明 |
-| --- | --- | --- | --- | --- |
-| `bot_id` | `str` | ✅ | — | 机器人 ID（企业微信后台获取） |
-| `secret` | `str` | ✅ | — | 机器人 Secret（企业微信后台获取） |
-| `reconnect_interval` | `int` | — | `1000` | 重连基础延迟（毫秒），实际延迟按指数退避递增 |
-| `max_reconnect_attempts` | `int` | — | `10` | 最大重连次数（`-1` 表示无限重连） |
-| `heartbeat_interval` | `int` | — | `30000` | 心跳间隔（毫秒） |
-| `request_timeout` | `int` | — | `10000` | HTTP 请求超时时间（毫秒） |
-| `ws_url` | `str` | — | `wss://openws.work.weixin.qq.com` | 自定义 WebSocket 连接地址 |
-| `logger` | `Logger` | — | `DefaultLogger` | 自定义日志实例 |
+| 参数                       | 类型       | 必填 | 默认值                               | 说明                     |
+|--------------------------|----------|----|-----------------------------------|------------------------|
+| `bot_id`                 | `str`    | ✅  | —                                 | 机器人 ID（企业微信后台获取）       |
+| `secret`                 | `str`    | ✅  | —                                 | 机器人 Secret（企业微信后台获取）   |
+| `reconnect_interval`     | `int`    | —  | `1000`                            | 重连基础延迟（毫秒），实际延迟按指数退避递增 |
+| `max_reconnect_attempts` | `int`    | —  | `10`                              | 最大重连次数（`-1` 表示无限重连）    |
+| `heartbeat_interval`     | `int`    | —  | `30000`                           | 心跳间隔（毫秒）               |
+| `request_timeout`        | `int`    | —  | `10000`                           | HTTP 请求超时时间（毫秒）        |
+| `ws_url`                 | `str`    | —  | `wss://openws.work.weixin.qq.com` | 自定义 WebSocket 连接地址     |
+| `logger`                 | `Logger` | —  | `DefaultLogger`                   | 自定义日志实例                |
 
 ## 📡 事件列表
 
 所有事件均通过 `@ws_client.on(event)` 装饰器或 `ws_client.on(event, handler)` 监听：
 
-| 事件 | 回调参数 | 说明 |
-| --- | --- | --- |
-| `connected` | — | WebSocket 连接建立 |
-| `authenticated` | — | 认证成功 |
-| `disconnected` | `reason: str` | 连接断开 |
-| `reconnecting` | `attempt: int` | 正在重连（第 N 次） |
-| `error` | `error: Exception` | 发生错误 |
-| `message` | `frame: WsFrame` | 收到消息（所有类型） |
-| `message.text` | `frame: WsFrame` | 收到文本消息 |
-| `message.image` | `frame: WsFrame` | 收到图片消息 |
-| `message.mixed` | `frame: WsFrame` | 收到图文混排消息 |
-| `message.voice` | `frame: WsFrame` | 收到语音消息 |
-| `message.file` | `frame: WsFrame` | 收到文件消息 |
-| `event` | `frame: WsFrame` | 收到事件回调（所有事件类型） |
-| `event.enter_chat` | `frame: WsFrame` | 收到进入会话事件 |
-| `event.template_card_event` | `frame: WsFrame` | 收到模板卡片事件 |
-| `event.feedback_event` | `frame: WsFrame` | 收到用户反馈事件 |
+| 事件                          | 回调参数               | 说明             |
+|-----------------------------|--------------------|----------------|
+| `connected`                 | —                  | WebSocket 连接建立 |
+| `authenticated`             | —                  | 认证成功           |
+| `disconnected`              | `reason: str`      | 连接断开           |
+| `reconnecting`              | `attempt: int`     | 正在重连（第 N 次）    |
+| `error`                     | `error: Exception` | 发生错误           |
+| `message`                   | `frame: WsFrame`   | 收到消息（所有类型）     |
+| `message.text`              | `frame: WsFrame`   | 收到文本消息         |
+| `message.image`             | `frame: WsFrame`   | 收到图片消息         |
+| `message.mixed`             | `frame: WsFrame`   | 收到图文混排消息       |
+| `message.voice`             | `frame: WsFrame`   | 收到语音消息         |
+| `message.file`              | `frame: WsFrame`   | 收到文件消息         |
+| `event`                     | `frame: WsFrame`   | 收到事件回调（所有事件类型） |
+| `event.enter_chat`          | `frame: WsFrame`   | 收到进入会话事件       |
+| `event.template_card_event` | `frame: WsFrame`   | 收到模板卡片事件       |
+| `event.feedback_event`      | `frame: WsFrame`   | 收到用户反馈事件       |
 
 ## 📋 消息类型
 
 SDK 支持以下消息类型（`MessageType` 枚举）：
 
-| 类型 | 值 | 说明 |
-| --- | --- | --- |
-| `MessageType.Text` | `'text'` | 文本消息 |
-| `MessageType.Image` | `'image'` | 图片消息 |
+| 类型                  | 值         | 说明     |
+|---------------------|-----------|--------|
+| `MessageType.Text`  | `'text'`  | 文本消息   |
+| `MessageType.Image` | `'image'` | 图片消息   |
 | `MessageType.Mixed` | `'mixed'` | 图文混排消息 |
-| `MessageType.Voice` | `'voice'` | 语音消息 |
-| `MessageType.File` | `'file'` | 文件消息 |
+| `MessageType.Voice` | `'voice'` | 语音消息   |
+| `MessageType.File`  | `'file'`  | 文件消息   |
 
 SDK 支持以下事件类型（`EventType` 枚举）：
 
-| 类型 | 值 | 说明 |
-| --- | --- | --- |
-| `EventType.EnterChat` | `'enter_chat'` | 进入会话事件 |
+| 类型                            | 值                       | 说明     |
+|-------------------------------|-------------------------|--------|
+| `EventType.EnterChat`         | `'enter_chat'`          | 进入会话事件 |
 | `EventType.TemplateCardEvent` | `'template_card_event'` | 模板卡片事件 |
-| `EventType.FeedbackEvent` | `'feedback_event'` | 用户反馈事件 |
+| `EventType.FeedbackEvent`     | `'feedback_event'`      | 用户反馈事件 |
 
 ## 🪵 自定义日志
 
@@ -294,6 +301,7 @@ class MyLogger:
 
     def error(self, message: str, *args) -> None:
         print(f"[ERROR] {message}", *args)
+
 
 ws_client = WSClient(
     WSClientOptions(
