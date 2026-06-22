@@ -144,7 +144,7 @@ class WsConnectionManager:
             await self._send_auth()
 
             # 启动消息接收循环
-            self._receive_task = asyncio.ensure_future(self._receive_loop())
+            self._receive_task = asyncio.create_task(self._receive_loop())
 
         except Exception as e:
             self._logger.error(f"Failed to create WebSocket connection: {e}")
@@ -280,7 +280,7 @@ class WsConnectionManager:
     def _start_heartbeat(self) -> None:
         """启动心跳定时器"""
         self._stop_heartbeat()
-        self._heartbeat_task = asyncio.ensure_future(self._heartbeat_loop())
+        self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
         self._logger.debug(
             f"Heartbeat timer started, interval: {self._heartbeat_interval}ms"
         )
@@ -425,7 +425,7 @@ class WsConnectionManager:
 
         # 如果队列中只有这一条，立即开始处理
         if len(queue) == 1 and req_id not in self._processing_queues:
-            asyncio.ensure_future(self._process_reply_queue(req_id))
+            asyncio.create_task(self._process_reply_queue(req_id))
 
         return await future
 
@@ -548,7 +548,7 @@ class WsConnectionManager:
         self._clear_pending_messages("Connection manually closed")
 
         if self._ws:
-            asyncio.ensure_future(self._async_disconnect())
+            asyncio.create_task(self._async_disconnect())
 
         self._logger.info("WebSocket connection manually closed")
 
