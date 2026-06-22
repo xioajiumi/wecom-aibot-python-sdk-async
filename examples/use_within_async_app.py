@@ -54,13 +54,6 @@ from aibot import WSClient, WSClientOptions, generate_req_id
 
 from types import SimpleNamespace
 
-print_logger = SimpleNamespace(
-    info=print,
-    warn=print,
-    error=print,
-    debug=print,
-)
-
 
 def get_logger(name: str) -> logging.Logger:
     logger: logging.Logger = logging.getLogger(name)
@@ -83,8 +76,7 @@ def get_logger(name: str) -> logging.Logger:
     return logger
 
 
-biz_logger = get_logger("wecom async demo")
-logger = biz_logger
+logger = get_logger("wecom async demo")
 
 AsyncEventHandler = Callable[..., Awaitable[None]]
 
@@ -94,13 +86,17 @@ def get_current_time():
 
 
 async def send_wecom_message(WEBHOOK_URL: str, content: str) -> bool:
-    """使用webhook发送消息。可以用来实现@效果"""
+    """
+    使用webhook发送消息。可以用来实现@效果
+    ⚠️ 必须先安装 httpx 或其他包
+    """
     HAS_httpx = True
     try:
         import httpx
     except ImportError:
         HAS_httpx = False
     if not HAS_httpx:
+        logger.warning("缺少httpx，无法发送@信息")
         return False
     payload = {
         "msgtype": "text",
@@ -362,7 +358,7 @@ class WeComAiBotChannel:
             False,
         )
         reply_text = await handle(content, quote_text=quote_text)
-        await self.send_at_message()
+        await self.send_at_message(body["from"]["userid"])
         await self._client.reply_stream(
             frame,
             stream_id,
@@ -380,7 +376,7 @@ class WeComAiBotChannel:
 
     async def send_message(self, message: str) -> None:
         if not self._target_id:
-            logger.warn("wecom aibot send skipped reason=target_id_missing")
+            logger.warning("wecom aibot send skipped reason=target_id_missing")
             return
         await self.send_at_message()
         body = {
