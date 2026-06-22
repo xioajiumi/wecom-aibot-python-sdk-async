@@ -18,6 +18,14 @@ except ImportError:
     # 未安装 certifi 时回退到系统默认证书
     _SSL_CONTEXT = ssl.create_default_context()
 
+try:
+    from websockets.asyncio.client import ClientConnection, connect
+    from websockets.protocol import State
+except ImportError as exc:
+    raise ImportError(
+        "请安装 websockets>=14.0: pip install 'websockets>=14.0,<16.0'"
+    ) from exc
+
 from .types import WsCmd, WsFrame
 from .utils import generate_req_id
 
@@ -26,22 +34,14 @@ DEFAULT_WS_URL = "wss://openws.work.weixin.qq.com"
 
 try:
     import websockets
-    from websockets.client import WebSocketClientProtocol
+    from websockets.asyncio.client import ClientConnection, connect
+    from websockets.protocol import State
 
 
-    def _ws_is_open(ws) -> bool:
-        """兼容 websockets 新旧版本的连接状态判断"""
-        if hasattr(ws, 'open'):
-            # websockets <= 13.x
-            return ws.open
-        elif hasattr(ws, 'state'):
-            # websockets >= 14.x
-            try:
-                from websockets.protocol import State
-                return ws.state is State.OPEN
-            except ImportError:
-                return ws.state.name == 'OPEN'
-        return False
+    def _ws_is_open(ws: ClientConnection | None) -> bool:
+        if ws is None:
+            return False
+        return ws.state is State.OPEN
 except ImportError:
     raise ImportError("请安装 websockets: pip install websockets>=12.0")
 
@@ -77,7 +77,7 @@ class WsConnectionManager:
         self._reconnect_base_delay = reconnect_base_delay
         self._max_reconnect_attempts = max_reconnect_attempts
 
-        self._ws: Optional[WebSocketClientProtocol] = None
+        self._ws: ClientConnection | None = None
         self._heartbeat_task: Optional[asyncio.Task[None]] = None
         self._receive_task: Optional[asyncio.Task[None]] = None
         self._reconnect_attempts: int = 0
