@@ -30,8 +30,8 @@ pip install wecom-aibot-python-sdk-async
 
 **依赖：**
 
-- Python >= 3.8
-- websockets >= 12.0
+- Python >= 3.10
+- websockets >= 14.0
 - aiohttp >= 3.9
 - pyee >= 11.0
 - cryptography >= 42.0
