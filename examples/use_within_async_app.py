@@ -42,6 +42,7 @@ import os
 import signal
 import sys
 import logging
+import time
 from datetime import datetime
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
@@ -51,8 +52,6 @@ from typing import Any
 from dotenv import load_dotenv
 
 from aibot import WSClient, WSClientOptions, generate_req_id
-
-from types import SimpleNamespace
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -132,7 +131,7 @@ def parse_command(content: str) -> str | None:
 
 
 async def handle(content: str, quote_text: str = None) -> str:
-    """方便后续接入 健康检查/环境检查/刷新缓存、配置 等功能。这种语法对py大版本有要求"""
+    """方便后续接入 健康检查/环境检查/刷新缓存、配置 等功能。这种 match 语法对py大版本有要求"""
     command = parse_command(content)
     match command:
         case "性能":
@@ -175,6 +174,7 @@ class WeComAiBotChannel:
         self._target_id = target_id
         self._notifier_id = notifier_id
         self._at_notifier_hook = at_notifier_hook
+        self.is_running = False
 
         self._client = WSClient(
             WSClientOptions(
@@ -184,16 +184,7 @@ class WeComAiBotChannel:
             )
         )
 
-        # 嵌入在异步app环境中的事件绑定和触发都会有一些问题。这里做了异步兼容
-        self._runner_task: asyncio.Task[None] | None = None
-        self._stop_event: asyncio.Event | None = None
-        self._callback_tasks: set[asyncio.Task[Any]] = set()
-
         self._bind_events()
-
-    @property
-    def is_running(self) -> bool:
-        return self._runner_task is not None and not self._runner_task.done()
 
     async def start(self) -> None:
         """启动机器人后台长连接。"""
@@ -201,12 +192,7 @@ class WeComAiBotChannel:
         if self.is_running:
             logger.info("wecom aibot already started")
             return
-
-        self._stop_event = asyncio.Event()
-        self._runner_task = asyncio.create_task(
-            self._run_until_stopped(),
-            name="wecom-aibot-runner",
-        )
+        await self._client.connect()
 
         logger.info("wecom aibot started")
 
@@ -214,132 +200,40 @@ class WeComAiBotChannel:
         """停止机器人后台长连接。"""
 
         logger.info("wecom aibot stopping")
-
-        if self._stop_event is not None:
-            self._stop_event.set()
-
-        self._client.disconnect()
-
-        if self._runner_task is not None:
-            try:
-                await asyncio.wait_for(self._runner_task, timeout=5)
-            except TimeoutError:
-                logger.warn("wecom aibot runner stop timeout, cancelling")
-                self._runner_task.cancel()
-                with suppress(asyncio.CancelledError):
-                    await self._runner_task
-
-        await self._cancel_callback_tasks()
-
-        self._runner_task = None
-        self._stop_event = None
-
+        if self.is_running:
+            self._client.disconnect()
+            self.is_running = False
         logger.info("wecom aibot stopped")
 
-    async def _run_until_stopped(self) -> None:
-        if self._stop_event is None:
-            logger.warn("wecom aibot run skipped reason=stop_event_missing")
-            return
-
-        try:
-            logger.info("wecom client connecting")
-            await self._client.connect()
-            logger.info(f"wecom client connected connected={self._client.is_connected}")
-
-            await self._stop_event.wait()
-            logger.info("wecom stop event received")
-
-        except asyncio.CancelledError:
-            logger.warn("wecom aibot runner cancelled")
-            raise
-
-        except Exception as e:
-            logger.error(f"wecom aibot runner failed error={e!r}")
-
-        finally:
-            self._client.disconnect()
-            logger.info(f"wecom client disconnected connected={self._client.is_connected}")
-
     def _bind_events(self) -> None:
-        @self._async_on("authenticated")
+        @self._client.on("authenticated")
         async def on_authenticated() -> None:
-            logger.info("wecom aibot authenticated")
+            logger.info("微信机器人认证成功")
+            self.is_running = True
 
             # 更推荐在认证成功后发启动消息。
             if self._target_id:
                 await self.send_message(f"BOT started 时间:{get_current_time()}")
 
-        @self._async_on("connected")
+        @self._client.on("connected")
         async def on_connected() -> None:
-            logger.info("wecom aibot connected")
+            logger.info("微信机器人连接成功")
 
-        @self._async_on("disconnected")
+        @self._client.on("disconnected")
         async def on_disconnected(reason: str) -> None:
-            logger.warn(f"wecom aibot disconnected reason={reason!r}")
+            logger.warning(f"微信机器人连接中断 原因={reason!r}")
 
-        @self._async_on("reconnecting")
+        @self._client.on("reconnecting")
         async def on_reconnecting(attempt: int) -> None:
-            logger.warn(f"wecom aibot reconnecting attempt={attempt}")
+            logger.warning(f"微信机器人尝试重连 attempt={attempt}")
 
-        @self._async_on("error")
+        @self._client.on("error")
         async def on_error(error: Exception) -> None:
-            logger.error(f"wecom aibot error error={error!r}")
+            logger.error(f"微信机器人故障 error={error!r}")
 
-        @self._async_on("message.text")
+        @self._client.on("message.text")
         async def on_text(frame: dict[str, Any]) -> None:
             await self._handle_text_message(frame)
-
-    def _async_on(self, event_name: str) -> Callable[[AsyncEventHandler], AsyncEventHandler]:
-        """把 async 事件处理器包装成 SDK 可接受的同步回调。"""
-
-        def decorator(handler: AsyncEventHandler) -> AsyncEventHandler:
-            @self._client.on(event_name)
-            def wrapper(*args: Any, **kwargs: Any) -> None:
-                self._create_callback_task(
-                    handler(*args, **kwargs),
-                    name=f"wecom-aibot-callback-{event_name}",
-                )
-
-            return handler
-
-        return decorator
-
-    def _create_callback_task(
-            self,
-            coro: Awaitable[Any],
-            *,
-            name: str,
-    ) -> None:
-        """统一调度异步回调，避免 SDK 直接执行 async handler。"""
-
-        task = asyncio.create_task(coro, name=name)
-        self._callback_tasks.add(task)
-
-        def on_done(t: asyncio.Task[Any]) -> None:
-            self._callback_tasks.discard(t)
-
-            try:
-                t.result()
-            except asyncio.CancelledError:
-                logger.warn(f"{name} cancelled")
-            except Exception as e:
-                logger.error(f"{name} failed error={e!r}")
-
-        task.add_done_callback(on_done)
-
-    async def _cancel_callback_tasks(self) -> None:
-        if not self._callback_tasks:
-            return
-
-        logger.warn(f"wecom aibot cancelling callback tasks count={len(self._callback_tasks)}")
-
-        tasks = list(self._callback_tasks)
-
-        for task in tasks:
-            task.cancel()
-
-        await asyncio.gather(*tasks, return_exceptions=True)
-        self._callback_tasks.clear()
 
     async def _handle_text_message(self, frame: dict[str, Any]) -> None:
         body = frame.get("body", {})
@@ -427,6 +321,9 @@ async def main() -> None:
 
     try:
         await stop_event.wait()
+        await asyncio.sleep(5)
+        logger.warning("测试主动断开功能")
+        await channel.stop()
     finally:
         await channel.stop()
 
