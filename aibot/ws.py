@@ -12,6 +12,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 try:
     import certifi
+
     _SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
 except ImportError:
     # 未安装 certifi 时回退到系统默认证书
@@ -26,6 +27,7 @@ DEFAULT_WS_URL = "wss://openws.work.weixin.qq.com"
 try:
     import websockets
     from websockets.client import WebSocketClientProtocol
+
 
     def _ws_is_open(ws) -> bool:
         """兼容 websockets 新旧版本的连接状态判断"""
@@ -62,12 +64,12 @@ class WsConnectionManager:
     """
 
     def __init__(
-        self,
-        logger: Any,
-        heartbeat_interval: int = 30000,
-        reconnect_base_delay: int = 1000,
-        max_reconnect_attempts: int = 10,
-        ws_url: Optional[str] = None,
+            self,
+            logger: Any,
+            heartbeat_interval: int = 30000,
+            reconnect_base_delay: int = 1000,
+            max_reconnect_attempts: int = 10,
+            ws_url: Optional[str] = None,
     ):
         self._logger = logger
         self._ws_url = ws_url or DEFAULT_WS_URL
@@ -219,14 +221,14 @@ class WsConnectionManager:
 
         # 消息推送
         if cmd == WsCmd.CALLBACK:
-            self._logger.debug(f"Received push message: {json.dumps(frame.get('body', {}))}")
+            self._logger.debug(f"Received push message: {json.dumps(frame.get('body', {}), ensure_ascii=False)}")
             if self.on_message:
                 self.on_message(frame)
             return
 
         # 事件推送
         if cmd == WsCmd.EVENT_CALLBACK:
-            self._logger.debug(f"Received event callback: {json.dumps(frame.get('body', {}))}")
+            self._logger.debug(f"Received event callback: {json.dumps(frame.get('body', {}), ensure_ascii=False)}")
             if self.on_message:
                 self.on_message(frame)
             return
@@ -273,7 +275,7 @@ class WsConnectionManager:
             return
 
         # 未知帧类型
-        self._logger.warn(f"Received unknown frame: {json.dumps(frame)}")
+        self._logger.warn(f"Received unknown frame: {json.dumps(frame, ensure_ascii=False)}")
         if self.on_message:
             self.on_message(frame)
 
@@ -338,8 +340,8 @@ class WsConnectionManager:
     async def _schedule_reconnect(self) -> None:
         """安排重连"""
         if (
-            self._max_reconnect_attempts != -1
-            and self._reconnect_attempts >= self._max_reconnect_attempts
+                self._max_reconnect_attempts != -1
+                and self._reconnect_attempts >= self._max_reconnect_attempts
         ):
             self._logger.error(
                 f"Max reconnect attempts reached ({self._max_reconnect_attempts}), giving up"
@@ -375,12 +377,12 @@ class WsConnectionManager:
         :raises RuntimeError: 连接未建立时
         """
         if self._ws and _ws_is_open(self._ws):
-            await self._ws.send(json.dumps(frame))
+            await self._ws.send(json.dumps(frame, ensure_ascii=False))
         else:
             raise RuntimeError("WebSocket not connected, unable to send data")
 
     async def send_reply(
-        self, req_id: str, body: Any, cmd: str = WsCmd.RESPONSE
+            self, req_id: str, body: Any, cmd: str = WsCmd.RESPONSE
     ) -> WsFrame:
         """
         通过 WebSocket 通道发送回复消息（串行队列版本）
@@ -482,7 +484,7 @@ class WsConnectionManager:
             self._processing_queues.discard(req_id)
 
     def _on_reply_ack_timeout(
-        self, req_id: str, ack_future: "asyncio.Future[WsFrame]"
+            self, req_id: str, ack_future: "asyncio.Future[WsFrame]"
     ) -> None:
         """回复回执超时回调"""
         self._logger.warn(

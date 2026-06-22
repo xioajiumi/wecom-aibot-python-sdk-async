@@ -36,11 +36,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     finally:
         await channel.stop()
 """
-
+from __future__ import annotations
 import asyncio
 import os
 import signal
 import sys
+import logging
 from datetime import datetime
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
@@ -53,12 +54,37 @@ from aibot import WSClient, WSClientOptions, generate_req_id
 
 from types import SimpleNamespace
 
-logger = SimpleNamespace(
+print_logger = SimpleNamespace(
     info=print,
     warn=print,
     error=print,
     debug=print,
 )
+
+
+def get_logger(name: str) -> logging.Logger:
+    logger: logging.Logger = logging.getLogger(name)
+
+    if logger.handlers:
+        return logger
+
+    logger.setLevel(logging.INFO)
+
+    handler: logging.StreamHandler = logging.StreamHandler()
+    handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s %(levelname)s %(name)s: %(message)s"
+        )
+    )
+
+    logger.addHandler(handler)
+    logger.propagate = False
+
+    return logger
+
+
+biz_logger = get_logger("wecom async demo")
+logger = biz_logger
 
 AsyncEventHandler = Callable[..., Awaitable[None]]
 
@@ -126,7 +152,10 @@ async def handle(content: str, quote_text: str = None) -> str:
 
 
 class WeComAiBotChannel:
-    """企业微信智能机器人通道。"""
+    """
+    企业微信智能机器人通道。
+    接入业务中可能需要一个适配层来处理企业微信机器人、飞书机器人、webhook等各种渠道，因此因此这里用Channel来进行演示，演示真实接入
+    """
 
     def __init__(
             self,
@@ -155,6 +184,7 @@ class WeComAiBotChannel:
             WSClientOptions(
                 bot_id=bot_id,
                 secret=bot_secret,
+                logger=logger
             )
         )
 
